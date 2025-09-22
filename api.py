@@ -344,8 +344,6 @@ ping_stats = defaultdict(lambda: {"count": 0, "bytes": 0, "reset": 0})
 async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
     await websocket.accept()
     user = None
-    subscriptions = set()
-    keepalive_task = None
     try:
         msg = await websocket.receive_bytes()
         msg_type, payload = C2S.parse(msg)
@@ -404,21 +402,17 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
                         db.add(Subscription(user_uuid=user.uuid,
                                target_uuid=target_uuid))
                         db.commit()
-                    subscriptions.add(target_uuid)
                 elif msg_type == C2S.UNSUB and payload:
                     target_uuid = payload["uuid"]
                     db.query(Subscription).filter_by(
                         user_uuid=user.uuid, target_uuid=target_uuid).delete()
                     db.commit()
-                    subscriptions.discard(target_uuid)
             except WebSocketDisconnect:
                 break
-            except Exception as e:
-                break
+            except Exception:
+                pass
     finally:
         if user:
             active_connections.pop(user.uuid, None)
-            db.query(Subscription).filter_by(user_uuid=user.uuid).delete()
-            db.commit()
         if websocket.client_state != WebSocket.DISCONNECTED:
             await websocket.close(code=1000, reason="Normal Closure")
