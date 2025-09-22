@@ -1,0 +1,29 @@
+{
+    "figuraVersions": {
+        "release": "0.1.5",
+        "prerelease": "0.1.5"
+    },
+    "motds": ["Custom Figura backend!?!?", "Hiii :33"],
+    "defaultLimits": {
+        "rate": {
+            "pingSize": 1024,
+            "pingRate": 32,
+            "equip": 1,
+            "download": 50,
+            "upload": 1
+        },
+        "limits": {
+            "maxAvatarSize": 100000,
+            "maxAvatars": 10,
+            "allowedBadges": {
+                "special": [0, 0, 0, 0, 0, 0],
+                "pride": [
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0
+                ]
+            }
+        }
+    },
+    "assetsUrl": "https://github.com/FiguraMC/Assets/archive/refs/heads/main.zip",
+    "assetsDir": "assets"
+}

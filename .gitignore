@@ -2,6 +2,6 @@
 __pycache__/
 localhost-key.pem
 localhost.pem
-avatars/
 assets/
-database.db
+figura.db
+config.json
