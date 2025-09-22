@@ -84,6 +84,63 @@ def get_user_by_token(token: str, db: Session):
     return db.query(User).filter_by(uuid=token_obj.user_uuid).first()
 
 
+class S2C:
+    AUTH = 0
+    PING = 1
+    EVENT = 2
+    TOAST = 3
+    CHAT = 4
+    NOTICE = 5
+    KEEPALIVE = 6
+
+    class NoticeType:
+        SIZE = 0
+        RATE = 1
+
+    class ToastType:
+        DEFAULT = 0
+        WARNING = 1
+        ERROR = 2
+        CHEESE = 3
+
+    @staticmethod
+    def auth():
+        return bytes([S2C.AUTH])
+
+    @staticmethod
+    def ping(target_uuid: str, ping_id: int, sync: bool, data: bytes):
+        uuid_bytes = uuidlib.UUID(target_uuid).bytes
+        msb = int.from_bytes(uuid_bytes[:8], "big", signed=False)
+        lsb = int.from_bytes(uuid_bytes[8:], "big", signed=False)
+        return struct.pack(">bQQib", S2C.PING, msb, lsb, ping_id, int(sync)) + data
+
+    @staticmethod
+    def event(uuid: str):
+        uuid_bytes = uuidlib.UUID(uuid).bytes
+        msb = int.from_bytes(uuid_bytes[:8], "big", signed=False)
+        lsb = int.from_bytes(uuid_bytes[8:], "big", signed=False)
+        return struct.pack(">bQQ", S2C.EVENT, msb, lsb)
+
+    @staticmethod
+    def toast(type: int, title: str, message: str = ""):
+        title_bytes = title.encode("utf-8")
+        message_bytes = message.encode("utf-8")
+        return struct.pack(">bb", S2C.TOAST, type) + title_bytes + b"\0" + message_bytes
+
+    @staticmethod
+    def chat(message: str):
+        message_bytes = message.encode("utf-8")
+        return bytes([S2C.CHAT]) + message_bytes
+
+    @staticmethod
+    def notice(type: int):
+        return bytes([S2C.NOTICE, type])
+
+    @staticmethod
+    def keepalive():
+        return bytes([S2C.KEEPALIVE])
+
+
 @router.get("/api/assets/v2")
 async def list_assets():
     assets_path = f"./{CONFIG.get('assetsDir', 'assets')}/Assets-main/"
@@ -171,6 +228,15 @@ async def upload_avatar(request: Request, db: Session = Depends(get_db)):
     else:
         db.add(Avatar(uuid=user.uuid, data=data))
     db.commit()
+    subs = db.query(Subscription).filter_by(target_uuid=user.uuid).all()
+    event_packet = S2C.event(user.uuid)
+    for sub in subs:
+        ws = active_connections.get(sub.user_uuid)
+        if ws:
+            try:
+                await ws.send_bytes(event_packet)
+            except Exception:
+                pass
     return Response(content="Avatar uploaded successfully", status_code=200)
 
 
@@ -269,63 +335,6 @@ class C2S:
             return msg_type, msg[1:]
 
 
-class S2C:
-    AUTH = 0
-    PING = 1
-    EVENT = 2
-    TOAST = 3
-    CHAT = 4
-    NOTICE = 5
-    KEEPALIVE = 6
-
-    class NoticeType:
-        SIZE = 0
-        RATE = 1
-
-    class ToastType:
-        DEFAULT = 0
-        WARNING = 1
-        ERROR = 2
-        CHEESE = 3
-
-    @staticmethod
-    def auth():
-        return bytes([S2C.AUTH])
-
-    @staticmethod
-    def ping(target_uuid: str, ping_id: int, sync: bool, data: bytes):
-        uuid_bytes = uuidlib.UUID(target_uuid).bytes
-        msb = int.from_bytes(uuid_bytes[:8], "big", signed=False)
-        lsb = int.from_bytes(uuid_bytes[8:], "big", signed=False)
-        return struct.pack(">bQQib", S2C.PING, msb, lsb, ping_id, int(sync)) + data
-
-    @staticmethod
-    def event(uuid: str):
-        uuid_bytes = uuidlib.UUID(uuid).bytes
-        msb = int.from_bytes(uuid_bytes[:8], "big", signed=False)
-        lsb = int.from_bytes(uuid_bytes[8:], "big", signed=False)
-        return struct.pack(">bQQ", S2C.EVENT, msb, lsb)
-
-    @staticmethod
-    def toast(type: int, title: str, message: str = ""):
-        title_bytes = title.encode("utf-8")
-        message_bytes = message.encode("utf-8")
-        return struct.pack(">bb", S2C.TOAST, type) + title_bytes + b"\0" + message_bytes
-
-    @staticmethod
-    def chat(message: str):
-        message_bytes = message.encode("utf-8")
-        return bytes([S2C.CHAT]) + message_bytes
-
-    @staticmethod
-    def notice(type: int):
-        return bytes([S2C.NOTICE, type])
-
-    @staticmethod
-    def keepalive():
-        return bytes([S2C.KEEPALIVE])
-
-
 ping_stats = defaultdict(lambda: {"count": 0, "bytes": 0, "reset": 0})
 
 
@@ -403,12 +412,11 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
             except WebSocketDisconnect:
                 break
             except Exception as e:
-                print(f"Error: {e}")
-                await websocket.close(code=1006, reason=str(e))
                 break
     finally:
         if user:
             active_connections.pop(user.uuid, None)
             db.query(Subscription).filter_by(user_uuid=user.uuid).delete()
             db.commit()
-        await websocket.close(code=1000, reason="Normal Closure")
+        if websocket.client_state != WebSocket.DISCONNECTED:
+            await websocket.close(code=1000, reason="Normal Closure")
