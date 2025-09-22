@@ -209,8 +209,8 @@ async def get_user_by_uuid(uuid: str, db: Session = Depends(get_db)):
             "banned": False,
             "equipped": [],
             "equippedBadges": {
-                "special": [int(x) for x in user.special_badges.split(",")],
-                "pride": [int(x) for x in user.pride_badges.split(",")]
+                "special": [int(x) for x in user.equipped_special_badges.split(",")],
+                "pride": [int(x) for x in user.equipped_pride_badges.split(",")]
             },
             "lastUsed": user.last_used.isoformat() + "Z" if user.last_used else "",
             "rank": "normal",

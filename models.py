@@ -41,6 +41,10 @@ class User(Base):
                             for x in default_special_badges))
     pride_badges = Column(String, default=",".join(str(x)
                           for x in default_pride_badges))
+    equipped_special_badges = Column(
+        String, default=",".join("0" for _ in default_special_badges))
+    equipped_pride_badges = Column(
+        String, default=",".join("0" for _ in default_pride_badges))
     tokens = relationship("Token", back_populates="user")
     last_used = Column(DateTime, nullable=True)
     version = Column(String, nullable=True)
