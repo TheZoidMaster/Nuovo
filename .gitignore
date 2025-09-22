@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+localhost-key.pem
+localhost.pem
+avatars/
+assets/
+database.db
