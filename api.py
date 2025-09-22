@@ -418,9 +418,11 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
                     db.query(Subscription).filter_by(
                         user_uuid=user.uuid, target_uuid=target_uuid).delete()
                     db.commit()
-            except WebSocketDisconnect:
+            except WebSocketDisconnect as e:
+                print(f"WebSocket disconnected: {e}")
                 break
-            except Exception:
+            except Exception as e:
+                print(f"Error in WebSocket communication: {e}")
                 pass
     finally:
         if user:
