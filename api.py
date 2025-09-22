@@ -231,6 +231,8 @@ async def upload_avatar(request: Request, db: Session = Depends(get_db)):
     subs = db.query(Subscription).filter_by(target_uuid=user.uuid).all()
     event_packet = S2C.event(user.uuid)
     for sub in subs:
+        if sub.user_uuid == user.uuid:
+            continue
         ws = active_connections.get(sub.user_uuid)
         if ws:
             try:
