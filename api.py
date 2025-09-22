@@ -94,7 +94,7 @@ async def list_assets():
 
 @router.get("/api/assets/v2/{asset_path:path}")
 async def get_asset(asset_path: str):
-    local_asset_path = f"./{CONFIG.get("assetsDir", "assets")}/Assets-main/v2/{asset_path}"
+    local_asset_path = f"./{CONFIG.get('assetsDir', 'assets')}/Assets-main/v2/{asset_path}"
     if os.path.exists(local_asset_path):
         with open(local_asset_path, "rb") as asset_file:
             asset_data = asset_file.read()
