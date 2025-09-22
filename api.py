@@ -252,6 +252,17 @@ async def delete_avatar(request: Request, db: Session = Depends(get_db)):
     if avatar:
         db.delete(avatar)
         db.commit()
+        subs = db.query(Subscription).filter_by(target_uuid=user.uuid).all()
+        event_packet = S2C.event(user.uuid)
+        for sub in subs:
+            if sub.user_uuid == user.uuid:
+                continue
+            ws = active_connections.get(sub.user_uuid)
+            if ws:
+                try:
+                    await ws.send_bytes(event_packet)
+                except Exception:
+                    pass
         return Response(content="Avatar deleted successfully", status_code=200)
     else:
         return Response(content="No avatar to delete", status_code=404)
