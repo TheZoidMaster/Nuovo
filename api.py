@@ -329,15 +329,6 @@ class S2C:
 ping_stats = defaultdict(lambda: {"count": 0, "bytes": 0, "reset": 0})
 
 
-async def keepalive_sender(ws):
-    try:
-        while True:
-            await asyncio.sleep(30)
-            await ws.send_bytes(S2C.keepalive())
-    except Exception:
-        pass
-
-
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
     await websocket.accept()
@@ -357,8 +348,6 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
             return
         active_connections[user.uuid] = websocket
         await websocket.send_bytes(S2C.auth())
-
-        keepalive_task = asyncio.create_task(keepalive_sender(websocket))
 
         while True:
             try:
@@ -413,13 +402,13 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
                     subscriptions.discard(target_uuid)
             except WebSocketDisconnect:
                 break
-            except Exception:
+            except Exception as e:
+                print(f"Error: {e}")
+                await websocket.close(code=1006, reason=str(e))
                 break
     finally:
-        if keepalive_task:
-            keepalive_task.cancel()
         if user:
             active_connections.pop(user.uuid, None)
             db.query(Subscription).filter_by(user_uuid=user.uuid).delete()
             db.commit()
-        await websocket.close(code=1000)
+        await websocket.close(code=1000, reason="Normal Closure")
