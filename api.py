@@ -189,7 +189,7 @@ async def get_motd(request: Request, db: Session = Depends(get_db)):
 
     motds = CONFIG.get("motds", [])
 
-    motds_folder = CONFIG.get("motdsFolder", "motds")
+    motds_folder = CONFIG.get("motdsDir", "motds")
     if os.path.exists(motds_folder) and os.path.isdir(motds_folder):
         for filename in os.listdir(motds_folder):
             file_path = os.path.join(motds_folder, filename)
