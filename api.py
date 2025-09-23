@@ -204,7 +204,11 @@ async def get_motd(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/api/version")
-async def get_version():
+async def get_version(request: Request, db: Session = Depends(get_db)):
+    token = request.headers.get("token")
+    user = get_user_by_token(token, db) if token else None
+    if not user:
+        return Response(content="Invalid token", status_code=403)
     return CONFIG.get("figuraVersions", {
         "release": "0.1.5",
         "prerelease": "0.1.5"
@@ -302,7 +306,11 @@ async def equip_item(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/api/{uuid}")
-async def get_user_by_uuid(uuid: str, db: Session = Depends(get_db)):
+async def get_user_by_uuid(request: Request, uuid: str, db: Session = Depends(get_db)):
+    token = request.headers.get("token")
+    user = get_user_by_token(token, db)
+    if not user:
+        return Response(content="Invalid token", status_code=403)
     try:
         user = db.query(User).filter_by(uuid=uuid).first()
         if not user:
@@ -333,7 +341,11 @@ async def get_user_by_uuid(uuid: str, db: Session = Depends(get_db)):
 
 
 @router.get("/api/{uuid}/avatar")
-async def download_avatar(uuid: str, db: Session = Depends(get_db)):
+async def download_avatar(request: Request, uuid: str, db: Session = Depends(get_db)):
+    token = request.headers.get("token")
+    user = get_user_by_token(token, db)
+    if not user:
+        return Response(content="Invalid token", status_code=403)
     try:
         avatar = db.query(Avatar).filter_by(uuid=uuid).first()
         if not avatar:
