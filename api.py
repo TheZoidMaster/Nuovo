@@ -187,7 +187,7 @@ async def get_motd(request: Request, db: Session = Depends(get_db)):
         user.version = version
     db.commit()
 
-    motds = CONFIG.get("motds", [])
+    motds = CONFIG.get("motds", []).copy()
 
     motds_folder = CONFIG.get("motdsDir", "motds")
     if os.path.exists(motds_folder) and os.path.isdir(motds_folder):
@@ -353,6 +353,54 @@ async def download_avatar(request: Request, uuid: str, db: Session = Depends(get
         return Response(content=avatar.data, media_type="application/octet-stream")
     except Exception:
         return Response(content="Internal Server Error", status_code=500)
+
+
+@router.get("/api/owner/toast")
+async def send_toast(request: Request, title: str, message: str = "", type: int = 0, db: Session = Depends(get_db)):
+    token = request.headers.get("token")
+    user = get_user_by_token(token, db)
+    if not user:
+        return Response(content="Invalid token", status_code=403)
+    if user.uuid != CONFIG.get("ownerUUID"):
+        return Response(content="Forbidden", status_code=403)
+    toast_packet = S2C.toast(type, title, message)
+    for ws in active_connections.values():
+        try:
+            await ws.send_bytes(toast_packet)
+        except Exception:
+            pass
+    return Response(content="Toast sent", status_code=200)
+
+
+@router.get("/api/owner/chat")
+async def send_chat(request: Request, message: str, db: Session = Depends(get_db)):
+    token = request.headers.get("token")
+    user = get_user_by_token(token, db)
+    if not user:
+        return Response(content="Invalid token", status_code=403)
+    if user.uuid != CONFIG.get("ownerUUID"):
+        return Response(content="Forbidden", status_code=403)
+    chat_packet = S2C.chat(message)
+    for ws in active_connections.values():
+        try:
+            await ws.send_bytes(chat_packet)
+        except Exception:
+            pass
+
+
+@router.get("/api/owner/reload")
+async def reload_config(request: Request, db: Session = Depends(get_db)):
+    token = request.headers.get("token")
+    user = get_user_by_token(token, db)
+    if not user:
+        return Response(content="Invalid token", status_code=403)
+    if user.uuid != CONFIG.get("ownerUUID"):
+        return Response(content="Forbidden", status_code=403)
+    global CONFIG
+    CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+    with open(CONFIG_PATH, "r") as f:
+        CONFIG = json.load(f)
+    return Response(content="Config reloaded", status_code=200)
 
 
 class C2S:
