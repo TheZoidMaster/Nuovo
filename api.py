@@ -371,6 +371,7 @@ asyncio.create_task(keepalive())
 async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
     await websocket.accept()
     user = None
+    error = None
     try:
         msg = await websocket.receive_bytes()
         msg_type, payload = C2S.parse(msg)
@@ -434,10 +435,12 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
                     db.query(Subscription).filter_by(
                         user_uuid=user.uuid, target_uuid=target_uuid).delete()
                     db.commit()
-            except WebSocketDisconnect:
-                pass
-            except Exception:
-                pass
+            except WebSocketDisconnect as e:
+                error = e
+                break
+            except Exception as e:
+                error = e
+                break
     finally:
         if user:
             active_connections.pop(user.uuid, None)
@@ -445,3 +448,5 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
             await websocket.close(code=1000, reason="Normal Closure")
         except Exception:
             pass
+        if error:
+            print(f"WebSocket error: {error}")
