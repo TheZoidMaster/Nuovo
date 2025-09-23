@@ -351,6 +351,22 @@ class C2S:
 ping_stats = defaultdict(lambda: {"count": 0, "bytes": 0, "reset": 0})
 
 
+async def keepalive():
+    while True:
+        await asyncio.sleep(15)
+        to_remove = []
+        for uuid, ws in active_connections.items():
+            try:
+                await ws.send_bytes(S2C.keepalive())
+            except Exception:
+                to_remove.append(uuid)
+        for uuid in to_remove:
+            active_connections.pop(uuid, None)
+
+
+asyncio.create_task(keepalive())
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
     await websocket.accept()
