@@ -449,4 +449,4 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
         except Exception:
             pass
         if error:
-            print(f"WebSocket error: {error.with_traceback()}")
+            raise error
