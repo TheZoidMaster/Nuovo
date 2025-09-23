@@ -41,7 +41,7 @@ async def root():
 
 @router.get("/api")
 async def check_token_validity(request: Request, db: Session = Depends(get_db)):
-    token = request.headers.get("Authorization")
+    token = request.headers.get("token")
     if not token:
         return Response(content="Missing token", status_code=401)
     user = get_user_by_token(token, db)
