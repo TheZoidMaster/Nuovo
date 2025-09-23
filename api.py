@@ -13,7 +13,7 @@ from datetime import datetime
 import struct
 import time
 from collections import defaultdict
-import asyncio
+
 
 router = APIRouter()
 
@@ -186,7 +186,20 @@ async def get_motd(request: Request, db: Session = Depends(get_db)):
     if version:
         user.version = version
     db.commit()
-    motds = CONFIG.get("motds", ["No MOTDs configured"])
+
+    motds = CONFIG.get("motds", [])
+
+    motds_folder = CONFIG.get("motdsFolder", "motds")
+    if os.path.exists(motds_folder) and os.path.isdir(motds_folder):
+        for filename in os.listdir(motds_folder):
+            file_path = os.path.join(motds_folder, filename)
+            if os.path.isfile(file_path):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    motds.append(f.read().strip())
+
+    if not motds:
+        motds = ["No MOTDs configured"]
+
     return Response(content=random.choice(motds), media_type="text/plain")
 
 
@@ -293,9 +306,9 @@ async def get_user_by_uuid(uuid: str, db: Session = Depends(get_db)):
     try:
         user = db.query(User).filter_by(uuid=uuid).first()
         if not user:
-            return Response(content="User not found", status_code=404)
+            return {"uuid": uuid}
         base = {
-            "uuid": user.uuid,
+            "uuid": user.uuid if user.uuid else uuid,
             "banned": False,
             "equipped": [],
             "equippedBadges": {
@@ -437,6 +450,6 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
         if user:
             active_connections.pop(user.uuid, None)
         try:
-            await websocket.close(code=1000, reason="Normal Closure")
+            await websocket.close(code=1011, reason="Unexpected error")
         except Exception:
             pass
