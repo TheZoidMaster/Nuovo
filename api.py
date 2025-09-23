@@ -390,13 +390,13 @@ async def send_chat(request: Request, message: str, db: Session = Depends(get_db
 
 @router.get("/api/owner/reload")
 async def reload_config(request: Request, db: Session = Depends(get_db)):
+    global CONFIG
     token = request.headers.get("token")
     user = get_user_by_token(token, db)
     if not user:
         return Response(content="Invalid token", status_code=403)
     if user.uuid != CONFIG.get("ownerUUID"):
         return Response(content="Forbidden", status_code=403)
-    global CONFIG
     CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
     with open(CONFIG_PATH, "r") as f:
         CONFIG = json.load(f)
