@@ -34,6 +34,22 @@ with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     CONFIG = json.load(f)
 
 
+@router.get("/")
+async def root():
+    return {"message": "Hiii :3"}
+
+
+@router.get("/api")
+async def check_token_validity(request: Request, db: Session = Depends(get_db)):
+    token = request.headers.get("Authorization")
+    if not token:
+        return Response(content="Missing token", status_code=401)
+    user = get_user_by_token(token, db)
+    if not user:
+        return Response(content="Invalid token", status_code=401)
+    return Response(content="Valid token", status_code=200)
+
+
 @router.get("/api/auth/id")
 async def get_auth_id(username: str, db: Session = Depends(get_db)):
     existing = db.query(PendingVerification).filter_by(
@@ -91,7 +107,6 @@ class S2C:
     TOAST = 3
     CHAT = 4
     NOTICE = 5
-    KEEPALIVE = 6
 
     class NoticeType:
         SIZE = 0
@@ -135,10 +150,6 @@ class S2C:
     @staticmethod
     def notice(type: int):
         return bytes([S2C.NOTICE, type])
-
-    @staticmethod
-    def keepalive():
-        return bytes([S2C.KEEPALIVE])
 
 
 @router.get("/api/assets/v2")
@@ -351,27 +362,10 @@ class C2S:
 ping_stats = defaultdict(lambda: {"count": 0, "bytes": 0, "reset": 0})
 
 
-async def keepalive():
-    while True:
-        await asyncio.sleep(15)
-        to_remove = []
-        for uuid, ws in active_connections.items():
-            try:
-                await ws.send_bytes(S2C.keepalive())
-            except Exception:
-                to_remove.append(uuid)
-        for uuid in to_remove:
-            active_connections.pop(uuid, None)
-
-
-asyncio.create_task(keepalive())
-
-
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
     await websocket.accept()
     user = None
-    error = None
     try:
         msg = await websocket.receive_bytes()
         msg_type, payload = C2S.parse(msg)
@@ -435,11 +429,9 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
                     db.query(Subscription).filter_by(
                         user_uuid=user.uuid, target_uuid=target_uuid).delete()
                     db.commit()
-            except WebSocketDisconnect as e:
-                error = e
+            except WebSocketDisconnect:
                 break
-            except Exception as e:
-                error = e
+            except Exception:
                 break
     finally:
         if user:
@@ -448,5 +440,3 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
             await websocket.close(code=1000, reason="Normal Closure")
         except Exception:
             pass
-        if error:
-            raise error
